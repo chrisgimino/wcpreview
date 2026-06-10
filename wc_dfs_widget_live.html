@@ -157,11 +157,32 @@ svg.pitch{width:100%;display:block;max-width:none}
   .gh-ml{font-size:17px}
   .pt th:nth-child(n+7),.pt td:nth-child(n+7){display:none}
 }
+
+  #loading-overlay {
+    position:fixed; inset:0; background:var(--bg);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    z-index:9999; gap:12px;
+  }
+  #loading-overlay.hidden { display:none; }
+  .ld-spinner {
+    width:32px; height:32px; border:2px solid var(--bd2);
+    border-top-color:var(--rg); border-radius:50%;
+    animation:spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .ld-text { font-family:var(--mono); font-size:10px; color:var(--muted); letter-spacing:2px; text-transform:uppercase; }
+  .ld-err  { font-family:var(--mono); font-size:10px; color:var(--r); letter-spacing:1px; text-align:center; max-width:300px; line-height:1.6; }
 </style>
 </head>
 <body>
 
-<div id="mainWrap"><div class="game-strip" id="gameStrip"></div>
+
+<div id="loading-overlay">
+  <div class="ld-spinner"></div>
+  <div class="ld-text" id="ld-msg">Loading slate data...</div>
+  <div class="ld-err" id="ld-err" style="display:none"></div>
+</div>
+<div class="game-strip" id="gameStrip"></div>
 <div class="game-hdr" id="gameHdr"></div>
 
 <div class="tab-bar">
@@ -176,26 +197,25 @@ svg.pitch{width:100%;display:block;max-width:none}
 <div class="pane"    id="pane-od"></div>
 <div class="pane"    id="pane-pv"></div>
 
-</div><div class="disc">PROJECTIONS &amp; ODDS DATA SUBJECT TO CHANGE AND NOT UPDATED LIVE. VISIT <a href="https://rotogrinders.com/lineuphq/soc" target="_blank">LINEUPHQ</a> AND OUR <a href="https://discord.com/channels/456864351870124032/456877613068058635" target="_blank">DISCORD</a> FOR THE LATEST PROJECTIONS AND UPDATES.</div>
+<div class="disc">PROJECTIONS &amp; ODDS DATA SUBJECT TO CHANGE AND NOT UPDATED LIVE. VISIT <a href="https://rotogrinders.com/lineuphq/soc" target="_blank">LINEUPHQ</a> AND OUR <a href="https://discord.com/channels/456864351870124032/456877613068058635" target="_blank">DISCORD</a> FOR THE LATEST PROJECTIONS AND UPDATES.</div>
 
 <script>
-// ── CSV DATA SOURCE ──────────────────────────────────────────────────────
+
 const CSV_URL = 'https://raw.githubusercontent.com/chrisgimino/wcpreview/refs/heads/main/slate_widget.csv';
 
 function parseCSV(text) {
   const lines = text.trim().split('\n');
   const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g,''));
   return lines.slice(1).map(line => {
-    // handle quoted fields with commas inside
-    const cols = [];
-    let cur = '', inQ = false;
+    const cols = [], cur = {c:''};
+    let inQ = false;
     for (let i = 0; i < line.length; i++) {
       const c = line[i];
       if (c === '"') { inQ = !inQ; }
-      else if (c === ',' && !inQ) { cols.push(cur); cur = ''; }
-      else { cur += c; }
+      else if (c === ',' && !inQ) { cols.push(cur.c); cur.c = ''; }
+      else { cur.c += c; }
     }
-    cols.push(cur);
+    cols.push(cur.c);
     const row = {};
     headers.forEach((h,i) => { row[h] = (cols[i]||'').replace(/^"|"$/g,'').trim(); });
     return row;
@@ -203,120 +223,68 @@ function parseCSV(text) {
 }
 
 function buildData(rows) {
-  const matches = [], players = [], previews = [], matrix = {};
-
+  const matches=[], players=[], previews=[], mx={};
   rows.forEach(r => {
-    if (r.record_type === 'MATCH') {
+    if (r.record_type==='MATCH') {
       matches.push({
-        match_id:     r.match_id,
-        team_a_abbr:  r.team_a_abbr,
-        team_b_abbr:  r.team_b_abbr,
-        team_a_name:  r.team_a_name,
-        team_b_name:  r.team_b_name,
-        date:         r.date,
-        time:         r.time,
-        ml_a:         r.ml_a,
-        ml_b:         r.ml_b,
-        ml_draw:      r.ml_draw,
-        ml_a_pct:     r.ml_a_pct,
-        ml_b_pct:     r.ml_b_pct,
-        ml_draw_pct:  r.ml_draw_pct,
-        total_line:   r.total_line,
-        team_a_total: r.team_a_total,
-        team_b_total: r.team_b_total,
-        matrix:       [],
+        match_id:r.match_id, team_a_abbr:r.team_a_abbr, team_b_abbr:r.team_b_abbr,
+        team_a_name:r.team_a_name, team_b_name:r.team_b_name,
+        date:r.date, time:r.time,
+        ml_a:r.ml_a, ml_b:r.ml_b, ml_draw:r.ml_draw,
+        ml_a_pct:r.ml_a_pct, ml_b_pct:r.ml_b_pct, ml_draw_pct:r.ml_draw_pct,
+        total_line:r.total_line, team_a_total:r.team_a_total, team_b_total:r.team_b_total,
+        matrix:[],
       });
-    } else if (r.record_type === 'PLAYER') {
+    } else if (r.record_type==='PLAYER') {
       players.push({
-        match_id:    r.match_id,
-        team_a_abbr: r.team_a_abbr,
-        team_b_abbr: r.team_b_abbr,
-        team_a_name: r.team_a_name,
-        team_b_name: r.team_b_name,
-        team:        r.team,
-        pos:         r.pos,
-        slot:        r.slot,
-        name:        r.name,
-        salary:      r.salary     ? parseInt(r.salary)      : null,
-        fpts:        r.fpts       ? parseFloat(r.fpts)      : null,
-        fpts_per_k:  r.fpts_per_k ? parseFloat(r.fpts_per_k): null,
-        opto_pct:    r.opto_pct   ? parseFloat(r.opto_pct)  : null,
-        proj_own:    r.proj_own   ? parseFloat(r.proj_own)  : null,
-        minutes:     r.minutes    ? parseFloat(r.minutes)   : null,
-        xg:          r.xg         ? parseFloat(r.xg)        : null,
-        xa:          r.xa         ? parseFloat(r.xa)        : null,
-        shots:       r.shots      ? parseFloat(r.shots)     : null,
-        goal_odds:   r.goal_odds  ? parseInt(r.goal_odds)   : null,
-        goal_book:   r.goal_book  || null,
-        assist_odds: r.assist_odds? parseInt(r.assist_odds) : null,
-        assist_book: r.assist_book|| null,
-        soa_odds:    r.soa_odds   ? parseInt(r.soa_odds)    : null,
-        soa_book:    r.soa_book   || null,
-        sot_line:    r.sot_line   ? parseFloat(r.sot_line)  : null,
-        sot_odds:    r.sot_odds   ? parseInt(r.sot_odds)    : null,
-        sot_book:    r.sot_book   || null,
-        ck_taker:    parseInt(r.ck_taker)||0,
-        fk_taker:    parseInt(r.fk_taker)||0,
-        inj_status:  r.inj_status || '',
-        inj_detail:  r.inj_detail || '',
+        match_id:r.match_id, team_a_abbr:r.team_a_abbr, team_b_abbr:r.team_b_abbr,
+        team_a_name:r.team_a_name, team_b_name:r.team_b_name,
+        team:r.team, pos:r.pos, slot:r.slot, name:r.name,
+        salary:    r.salary     ? parseInt(r.salary)       : null,
+        fpts:      r.fpts       ? parseFloat(r.fpts)       : null,
+        fpts_per_k:r.fpts_per_k ? parseFloat(r.fpts_per_k) : null,
+        opto_pct:  r.opto_pct   ? parseFloat(r.opto_pct)   : null,
+        proj_own:  r.proj_own   ? parseFloat(r.proj_own)   : null,
+        minutes:   r.minutes    ? parseFloat(r.minutes)    : null,
+        xg:        r.xg         ? parseFloat(r.xg)         : null,
+        xa:        r.xa         ? parseFloat(r.xa)         : null,
+        shots:     r.shots      ? parseFloat(r.shots)      : null,
+        goal_odds: r.goal_odds  ? parseInt(r.goal_odds)    : null, goal_book: r.goal_book||null,
+        assist_odds:r.assist_odds?parseInt(r.assist_odds)  : null, assist_book:r.assist_book||null,
+        soa_odds:  r.soa_odds   ? parseInt(r.soa_odds)     : null, soa_book:  r.soa_book||null,
+        sot_line:  r.sot_line   ? parseFloat(r.sot_line)   : null,
+        sot_odds:  r.sot_odds   ? parseInt(r.sot_odds)     : null, sot_book:  r.sot_book||null,
+        ck_taker:  parseInt(r.ck_taker)||0, fk_taker: parseInt(r.fk_taker)||0,
+        inj_status:r.inj_status||'', inj_detail:r.inj_detail||'',
       });
-    } else if (r.record_type === 'MATRIX') {
-      if (!matrix[r.match_id]) matrix[r.match_id] = [];
-      matrix[r.match_id].push({
-        score_a:    parseInt(r.score_a),
-        score_b:    parseInt(r.score_b),
-        matrix_prob:parseFloat(r.matrix_prob),
-      });
-    } else if (r.record_type === 'PREVIEW') {
-      previews.push({
-        match_id:     r.match_id,
-        team:         r.preview_team,
-        preview_type: r.preview_type,
-        preview_text: r.preview_text,
-      });
+    } else if (r.record_type==='MATRIX') {
+      if (!mx[r.match_id]) mx[r.match_id]=[];
+      mx[r.match_id].push({score_a:parseInt(r.score_a),score_b:parseInt(r.score_b),matrix_prob:parseFloat(r.matrix_prob)});
+    } else if (r.record_type==='PREVIEW') {
+      previews.push({match_id:r.match_id,team:r.preview_team,preview_type:r.preview_type,preview_text:r.preview_text});
     }
   });
-
-  // attach matrix rows to their match
-  matches.forEach(m => {
-    if (matrix[m.match_id]) m.matrix = matrix[m.match_id];
-  });
-
-  return { matches, players, previews };
+  matches.forEach(m => { if (mx[m.match_id]) m.matrix=mx[m.match_id]; });
+  return {matches,players,previews};
 }
 
-// ── LOADING STATE ────────────────────────────────────────────────────────────
-function showLoading() {
-  document.getElementById('mainWrap').innerHTML = `
-    <div style="padding:40px;text-align:center;font-family:Inter,sans-serif">
-      <div style="color:#0076FF;font-size:13px;letter-spacing:2px;text-transform:uppercase;margin-bottom:12px">Loading slate data...</div>
-      <div style="color:#444;font-size:11px">Fetching from data source</div>
-    </div>`;
-}
-
-function showError(msg) {
-  document.getElementById('mainWrap').innerHTML = `
-    <div style="padding:40px;text-align:center;font-family:Inter,sans-serif">
-      <div style="color:#ef4444;font-size:13px;letter-spacing:1px;margin-bottom:8px">Failed to load slate data</div>
-      <div style="color:#555;font-size:11px">${msg}</div>
-    </div>`;
-}
-
-// ── BOOT ─────────────────────────────────────────────────────────────────────
 let DATA = null;
 
 async function boot() {
-  showLoading();
   try {
     const res = await fetch(CSV_URL + '?t=' + Date.now());
-    if (!res.ok) throw new Error('HTTP ' + res.status);
+    if (!res.ok) throw new Error('HTTP ' + res.status + ' — check CSV URL');
     const text = await res.text();
     const rows = parseCSV(text);
     DATA = buildData(rows);
-    if (!DATA.matches.length) throw new Error('No match data found in CSV');
+    if (!DATA.matches.length) throw new Error('No MATCH rows found in CSV');
+    document.getElementById('loading-overlay').classList.add('hidden');
     init();
   } catch(e) {
-    showError(e.message);
+    document.querySelector('.ld-spinner').style.display='none';
+    document.getElementById('ld-msg').style.display='none';
+    document.getElementById('ld-err').style.display='block';
+    document.getElementById('ld-err').textContent = 'Failed to load: ' + e.message;
   }
 }
 
@@ -726,7 +694,6 @@ function renderPV(){
   document.getElementById('pane-pv').innerHTML=h;
 }
 
-// init() called by boot() after CSV loads
 </script>
 </body>
 </html>
