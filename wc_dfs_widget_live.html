@@ -292,7 +292,7 @@ boot();
 ;
 let AG=null,AT='lu',LV='grid',FT=null;
 
-const FLAGS={MEX:'🇲🇽',RSA:'🇿🇦',CZE:'🇨🇿',KOR:'🇰🇷',USA:'🇺🇸',BRA:'🇧🇷',ENG:'🏴󠁧󠁢󠁥󠁮󠁧󠁿',FRA:'🇫🇷',ARG:'🇦🇷',GER:'🇩🇪',ESP:'🇪🇸',POR:'🇵🇹',NED:'🇳🇱',BEL:'🇧🇪'};
+const FLAGS={MEX:'🇲🇽',RSA:'🇿🇦',CZE:'🇨🇿',KOR:'🇰🇷',USA:'🇺🇸',BRA:'🇧🇷',ENG:'🏴󠁧󠁢󠁥󠁮󠁧󠁿',FRA:'🇫🇷',ARG:'🇦🇷',GER:'🇩🇪',ESP:'🇪🇸',POR:'🇵🇹',NED:'🇳🇱',BEL:'🇧🇪',CAN:'🇨🇦',BIH:'🇧🇦',PAR:'🇵🇾',AUS:'🇦🇺',TUR:'🇹🇷',MAR:'🇲🇦',JPN:'🇯🇵',SEN:'🇸🇳',URU:'🇺🇾',COL:'🇨🇴',ECU:'🇪🇨',CHE:'🇨🇭',QAT:'🇶🇦',IRN:'🇮🇷',GHA:'🇬🇭',SCO:'🏴󠁧󠁢󠁳󠁣󠁴󠁿',NOR:'🇳🇴',SWE:'🇸🇪',CRO:'🇭🇷',DEN:'🇩🇰',POL:'🇵🇱',WAL:'🏴󠁧󠁢󠁷󠁬󠁳󠁿'};
 const f=a=>FLAGS[a]||'🏳️';
 
 const BOOKS={
@@ -664,8 +664,8 @@ function renderOD(){
     const aO=p.assist_odds?`<span class="oc ${ocCls(p.assist_odds)}">${fmtOdds(p.assist_odds)}</span>${bchip(p.assist_book)}`:`<span class="oc on">—</span>`;
     const sO=p.soa_odds?`<span class="oc ${ocCls(p.soa_odds)}">${fmtOdds(p.soa_odds)}</span>${bchip(p.soa_book)}`:`<span class="oc on">—</span>`;
     const sotO=p.sot_odds?`<span class="oc ${ocCls(p.sot_odds)}">${fmtOdds(p.sot_odds)}</span>${bchip(p.sot_book)}`:`<span class="oc on">—</span>`;
-    const inj=p.inj_status?`<span class="bx bx-q" style="font-size:7px">${p.inj_status}</span>`:'';    const teamFlag=f(p.team);
-    h+=`<tr><td>${p.name}${inj}</td><td style="padding:6px 8px;font-size:12px;text-align:center;white-space:nowrap">${teamFlag} ${p.team}</td><td>${gO}</td><td>${aO}</td><td>${sO}</td><td>${sotO}</td></tr>`;
+    const inj=p.inj_status?`<span class="bx bx-q" style="font-size:7px">${p.inj_status}</span>`:''; const ck=(p.ck_taker==1||p.ck_taker==='1')?'<span class="bx bx-ck" style="font-size:7px">⚽</span>':''; const teamFlag=f(p.team);
+    h+=`<tr><td>${p.name}${ck}${inj}</td><td style="padding:6px 8px;font-size:12px;text-align:center;white-space:nowrap">${teamFlag} ${p.team}</td><td>${gO}</td><td>${aO}</td><td>${sO}</td><td>${sotO}</td></tr>`;
   });
   h+='</tbody></table></div>';
   document.getElementById('pane-od').innerHTML=h;
