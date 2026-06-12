@@ -546,7 +546,7 @@ function buildField(players,team){
   activeCols.forEach((grp,ci)=>{
     const cx=nCols===1?W/2:padX+ci*colStep;
     const gps=grps[grp];
-    const ys=colYs(gps.length);
+    const ys=colYs(gps.length, grp);
     const lbl={GK:'GK',DEF:'D',MID:'M',FWD:'F',STR:'F'}[grp]||'?';
     gps.forEach((p,i)=>{
       const fpts=parseFloat(p.fpts)||0;
