@@ -131,6 +131,7 @@ svg.pitch{width:100%;display:block;max-width:none}
 .oa{background:var(--abg);color:#fcd34d}
 .on{background:var(--bg);color:var(--dim);text-align:center}
 .bk{display:inline-block;font-size:7px;font-weight:800;padding:1px 4px;border-radius:2px;letter-spacing:.3px;vertical-align:middle;margin-left:2px}
+.bx-cpt{background:#1a0a3a;color:#c084fc;border:1px solid #7c3aed}
 
 /* ── PREVIEW ── */
 .pv-s{padding:11px 14px;border-bottom:1px solid var(--bd);text-align:left}
@@ -156,6 +157,8 @@ svg.pitch{width:100%;display:block;max-width:none}
   .gh-name{font-size:19px}
   .gh-ml{font-size:17px}
   .pt th:nth-child(n+7),.pt td:nth-child(n+7){display:none}
+  /* showdown: hide xG/xA/Shots on mobile, keep CPT+FLEX salary/opto/own */
+  .pt th:nth-child(n+10),.pt td:nth-child(n+10){display:none}
 }
 
   #loading-overlay {
@@ -236,26 +239,37 @@ function buildData(rows) {
         matrix:[],
       });
     } else if (r.record_type==='PLAYER') {
+      // Support both classic (salary/opto_pct/proj_own) and showdown (flex_*/cpt_*) schemas
+      const isSD = !!(r.flex_salary || r.cpt_salary);
       players.push({
         match_id:r.match_id, team_a_abbr:r.team_a_abbr, team_b_abbr:r.team_b_abbr,
         team_a_name:r.team_a_name, team_b_name:r.team_b_name,
         team:r.team, pos:r.pos, slot:r.slot, name:r.name,
-        salary:    r.salary     ? parseInt(r.salary)       : null,
-        fpts:      r.fpts       ? parseFloat(r.fpts)       : null,
-        fpts_per_k:r.fpts_per_k ? parseFloat(r.fpts_per_k) : null,
-        opto_pct:  r.opto_pct   ? parseFloat(r.opto_pct)   : null,
-        proj_own:  r.proj_own   ? parseFloat(r.proj_own)   : null,
-        minutes:   r.minutes    ? parseFloat(r.minutes)    : null,
-        xg:        r.xg         ? parseFloat(r.xg)         : null,
-        xa:        r.xa         ? parseFloat(r.xa)         : null,
-        shots:     r.shots      ? parseFloat(r.shots)      : null,
-        goal_odds: r.goal_odds  ? parseInt(r.goal_odds)    : null, goal_book: r.goal_book||null,
-        assist_odds:r.assist_odds?parseInt(r.assist_odds)  : null, assist_book:r.assist_book||null,
-        soa_odds:  r.soa_odds   ? parseInt(r.soa_odds)     : null, soa_book:  r.soa_book||null,
-        sot_line:  r.sot_line   ? parseFloat(r.sot_line)   : null,
-        sot_odds:  r.sot_odds   ? parseInt(r.sot_odds)     : null, sot_book:  r.sot_book||null,
-        ck_taker:  parseInt(r.ck_taker)||0, fk_taker: parseInt(r.fk_taker)||0,
-        inj_status:r.inj_status||'', inj_detail:r.inj_detail||'',
+        // classic fallbacks keep backward compat
+        salary:       r.salary       ? parseInt(r.salary)             : (r.flex_salary ? parseInt(r.flex_salary) : null),
+        // showdown columns
+        flex_salary:  r.flex_salary  ? parseInt(r.flex_salary)        : null,
+        cpt_salary:   r.cpt_salary   ? parseInt(r.cpt_salary)         : null,
+        fpts:         r.fpts         ? parseFloat(r.fpts)             : null,
+        fpts_per_k:   r.fpts_per_k   ? parseFloat(r.fpts_per_k)       : null,
+        flex_opto_pct:r.flex_opto_pct? parseFloat(r.flex_opto_pct)    : null,
+        cpt_opto_pct: r.cpt_opto_pct ? parseFloat(r.cpt_opto_pct)     : null,
+        opto_pct:     r.opto_pct     ? parseFloat(r.opto_pct)         : (r.flex_opto_pct ? parseFloat(r.flex_opto_pct) : null),
+        flex_proj_own:r.flex_proj_own? parseFloat(r.flex_proj_own)    : null,
+        cpt_proj_own: r.cpt_proj_own ? parseFloat(r.cpt_proj_own)     : null,
+        proj_own:     r.proj_own     ? parseFloat(r.proj_own)         : (r.flex_proj_own ? parseFloat(r.flex_proj_own) : null),
+        minutes:      r.minutes      ? parseFloat(r.minutes)          : null,
+        xg:           r.xg           ? parseFloat(r.xg)               : null,
+        xa:           r.xa           ? parseFloat(r.xa)               : null,
+        shots:        r.shots        ? parseFloat(r.shots)            : null,
+        goal_odds:    r.goal_odds    ? parseInt(r.goal_odds)          : null, goal_book: r.goal_book||null,
+        assist_odds:  r.assist_odds  ? parseInt(r.assist_odds)        : null, assist_book:r.assist_book||null,
+        soa_odds:     r.soa_odds     ? parseInt(r.soa_odds)           : null, soa_book:  r.soa_book||null,
+        sot_line:     r.sot_line     ? parseFloat(r.sot_line)         : null,
+        sot_odds:     r.sot_odds     ? parseInt(r.sot_odds)           : null, sot_book:  r.sot_book||null,
+        ck_taker:     parseInt(r.ck_taker)||0, fk_taker: parseInt(r.fk_taker)||0,
+        inj_status:   r.inj_status||'', inj_detail:r.inj_detail||'',
+        isSD,
       });
     } else if (r.record_type==='MATRIX') {
       if (!mx[r.match_id]) mx[r.match_id]=[];
@@ -572,38 +586,81 @@ function renderPR(){
   const ps=DATA.players.filter(p=>p.match_id===AG);
   const ta=m.team_a_abbr,tb=m.team_b_abbr;
   const tn={[ta]:m.team_a_name,[tb]:m.team_b_name};
-  const allPpk=ps.map(p=>p.fpts_per_k),allOp=ps.map(p=>p.opto_pct),
-        allOwn=ps.map(p=>p.proj_own),allXg=ps.map(p=>p.xg),
+  const isSD=ps.some(p=>p.isSD);
+  const allPpk=ps.map(p=>p.fpts_per_k),allXg=ps.map(p=>p.xg),
         allXa=ps.map(p=>p.xa),allSh=ps.map(p=>p.shots);
-  const opMax=Math.max(...allOp.filter(v=>v&&!isNaN(parseFloat(v))).map(parseFloat));
   let h='';
   [ta,tb].forEach(team=>{
     const tp=ps.filter(p=>p.team===team).sort((a,b)=>(parseFloat(b.fpts)||0)-(parseFloat(a.fpts)||0));
-    h+=`<div class="pt-hdr">${f(team)} ${tn[team]}</div>
-    <table class="pt"><thead><tr>
-      <th>Player</th><th>Salary</th><th>FPts</th><th>$/K</th><th>Opto%</th><th>Own%</th><th>xG</th><th>xA</th><th>Shots</th>
-    </tr></thead><tbody>`;
-    tp.forEach(p=>{
-      const grp=pg(p.slot);
-      const ck=(p.ck_taker==1||p.ck_taker==='1')?'<span class="bx bx-ck" style="font-size:7px">⚽</span>':'';
-      const fk=(p.fk_taker==1||p.fk_taker==='1')?'<span class="bx bx-fk" style="font-size:7px">FK</span>':'';
-      const q=p.inj_status?`<span class="bx bx-q" style="font-size:7px">${p.inj_status}</span>`:'';
-      const sal=p.salary?'$'+parseInt(p.salary).toLocaleString():'—';
-      const opN=p.opto_pct?parseFloat(p.opto_pct).toFixed(0)+'%':'—';
-      const opCls=relCls(p.opto_pct,allOp);
-      h+=`<tr>
-        <td>${p.name}${ck}${fk}${q}</td>
-        <td><span class="sc ${salCls(p.salary)}">${sal}</span></td>
-        <td><span class="sc ${fpCls(p.fpts,grp)}">${fN(p.fpts,2)}</span></td>
-        <td><span class="sc ${relCls(p.fpts_per_k,allPpk)}">${fN(p.fpts_per_k,2)}</span></td>
-        <td><span class="sc ${opCls}">${opN}</span></td>
-        <td><span class="sc ${relCls(p.proj_own,allOwn)}">${fN(p.proj_own,1)}%</span></td>
-        <td><span class="sc ${relCls(p.xg,allXg)}">${fN(p.xg,3)}</span></td>
-        <td><span class="sc ${relCls(p.xa,allXa)}">${fN(p.xa,3)}</span></td>
-        <td><span class="sc ${relCls(p.shots,allSh)}">${fN(p.shots,2)}</span></td>
-      </tr>`;
-    });
-    h+='</tbody></table>';
+    if(isSD){
+      const allFO=tp.map(p=>p.flex_opto_pct), allCO=tp.map(p=>p.cpt_opto_pct);
+      const allFW=tp.map(p=>p.flex_proj_own), allCW=tp.map(p=>p.cpt_proj_own);
+      h+=`<div class="pt-hdr">${f(team)} ${tn[team]}</div>
+      <table class="pt"><thead><tr>
+        <th>Player</th>
+        <th><span class="bx bx-cpt" style="font-size:8px">CPT</span> Sal</th>
+        <th>FLEX Sal</th>
+        <th>FPts</th><th>$/K</th>
+        <th><span class="bx bx-cpt" style="font-size:8px">CPT</span> Opto</th>
+        <th>FLEX Opto</th>
+        <th><span class="bx bx-cpt" style="font-size:8px">CPT</span> Own</th>
+        <th>FLEX Own</th>
+        <th>xG</th><th>xA</th><th>Shots</th>
+      </tr></thead><tbody>`;
+      tp.forEach(p=>{
+        const grp=pg(p.slot);
+        const ck=(p.ck_taker==1||p.ck_taker==='1')?'<span class="bx bx-ck" style="font-size:7px">⚽</span>':'';
+        const q=p.inj_status?`<span class="bx bx-q" style="font-size:7px">${p.inj_status}</span>`:'';
+        const cSal=p.cpt_salary?'$'+p.cpt_salary.toLocaleString():'—';
+        const fSal=p.flex_salary?'$'+p.flex_salary.toLocaleString():'—';
+        const foN=p.flex_opto_pct!=null?p.flex_opto_pct.toFixed(1)+'%':'—';
+        const coN=p.cpt_opto_pct!=null?p.cpt_opto_pct.toFixed(1)+'%':'—';
+        const fwN=p.flex_proj_own!=null?p.flex_proj_own.toFixed(1)+'%':'—';
+        const cwN=p.cpt_proj_own!=null?p.cpt_proj_own.toFixed(1)+'%':'—';
+        h+=`<tr>
+          <td>${p.name}${ck}${q}</td>
+          <td><span class="sc hi">${cSal}</span></td>
+          <td><span class="sc ${salCls(p.flex_salary)}">${fSal}</span></td>
+          <td><span class="sc ${fpCls(p.fpts,grp)}">${fN(p.fpts,2)}</span></td>
+          <td><span class="sc ${relCls(p.fpts_per_k,allPpk)}">${fN(p.fpts_per_k,2)}</span></td>
+          <td><span class="sc ${relCls(p.cpt_opto_pct,allCO)}">${coN}</span></td>
+          <td><span class="sc ${relCls(p.flex_opto_pct,allFO)}">${foN}</span></td>
+          <td><span class="sc ${relCls(p.cpt_proj_own,allCW)}">${cwN}</span></td>
+          <td><span class="sc ${relCls(p.flex_proj_own,allFW)}">${fwN}</span></td>
+          <td><span class="sc ${relCls(p.xg,allXg)}">${fN(p.xg,3)}</span></td>
+          <td><span class="sc ${relCls(p.xa,allXa)}">${fN(p.xa,3)}</span></td>
+          <td><span class="sc ${relCls(p.shots,allSh)}">${fN(p.shots,2)}</span></td>
+        </tr>`;
+      });
+      h+='</tbody></table>';
+    } else {
+      // Classic layout unchanged
+      const allOp=tp.map(p=>p.opto_pct), allOwn=tp.map(p=>p.proj_own);
+      h+=`<div class="pt-hdr">${f(team)} ${tn[team]}</div>
+      <table class="pt"><thead><tr>
+        <th>Player</th><th>Salary</th><th>FPts</th><th>$/K</th><th>Opto%</th><th>Own%</th><th>xG</th><th>xA</th><th>Shots</th>
+      </tr></thead><tbody>`;
+      tp.forEach(p=>{
+        const grp=pg(p.slot);
+        const ck=(p.ck_taker==1||p.ck_taker==='1')?'<span class="bx bx-ck" style="font-size:7px">⚽</span>':'';
+        const fk=(p.fk_taker==1||p.fk_taker==='1')?'<span class="bx bx-fk" style="font-size:7px">FK</span>':'';
+        const q=p.inj_status?`<span class="bx bx-q" style="font-size:7px">${p.inj_status}</span>`:'';
+        const sal=p.salary?'$'+parseInt(p.salary).toLocaleString():'—';
+        const opN=p.opto_pct!=null?p.opto_pct.toFixed(0)+'%':'—';
+        h+=`<tr>
+          <td>${p.name}${ck}${fk}${q}</td>
+          <td><span class="sc ${salCls(p.salary)}">${sal}</span></td>
+          <td><span class="sc ${fpCls(p.fpts,grp)}">${fN(p.fpts,2)}</span></td>
+          <td><span class="sc ${relCls(p.fpts_per_k,allPpk)}">${fN(p.fpts_per_k,2)}</span></td>
+          <td><span class="sc ${relCls(p.opto_pct,allOp)}">${opN}</span></td>
+          <td><span class="sc ${relCls(p.proj_own,allOwn)}">${fN(p.proj_own,1)}%</span></td>
+          <td><span class="sc ${relCls(p.xg,allXg)}">${fN(p.xg,3)}</span></td>
+          <td><span class="sc ${relCls(p.xa,allXa)}">${fN(p.xa,3)}</span></td>
+          <td><span class="sc ${relCls(p.shots,allSh)}">${fN(p.shots,2)}</span></td>
+        </tr>`;
+      });
+      h+='</tbody></table>';
+    }
   });
   document.getElementById('pane-pr').innerHTML=h;
 }
