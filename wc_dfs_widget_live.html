@@ -598,12 +598,11 @@ function renderPR(){
       h+=`<div class="pt-hdr">${f(team)} ${tn[team]}</div>
       <table class="pt"><thead><tr>
         <th>Player</th>
-        <th><span class="bx bx-cpt" style="font-size:8px">CPT</span> Sal</th>
-        <th>FLEX Sal</th>
+        <th>Salary</th>
         <th>FPts</th><th>$/K</th>
         <th><span class="bx bx-cpt" style="font-size:8px">CPT</span> Opto</th>
-        <th>FLEX Opto</th>
         <th><span class="bx bx-cpt" style="font-size:8px">CPT</span> Own</th>
+        <th>FLEX Opto</th>
         <th>FLEX Own</th>
         <th>xG</th><th>xA</th><th>Shots</th>
       </tr></thead><tbody>`;
@@ -611,7 +610,6 @@ function renderPR(){
         const grp=pg(p.slot);
         const ck=(p.ck_taker==1||p.ck_taker==='1')?'<span class="bx bx-ck" style="font-size:7px">⚽</span>':'';
         const q=p.inj_status?`<span class="bx bx-q" style="font-size:7px">${p.inj_status}</span>`:'';
-        const cSal=p.cpt_salary?'$'+p.cpt_salary.toLocaleString():'—';
         const fSal=p.flex_salary?'$'+p.flex_salary.toLocaleString():'—';
         const foN=p.flex_opto_pct!=null?p.flex_opto_pct.toFixed(1)+'%':'—';
         const coN=p.cpt_opto_pct!=null?p.cpt_opto_pct.toFixed(1)+'%':'—';
@@ -619,13 +617,12 @@ function renderPR(){
         const cwN=p.cpt_proj_own!=null?p.cpt_proj_own.toFixed(1)+'%':'—';
         h+=`<tr>
           <td>${p.name}${ck}${q}</td>
-          <td><span class="sc hi">${cSal}</span></td>
           <td><span class="sc ${salCls(p.flex_salary)}">${fSal}</span></td>
           <td><span class="sc ${fpCls(p.fpts,grp)}">${fN(p.fpts,2)}</span></td>
           <td><span class="sc ${relCls(p.fpts_per_k,allPpk)}">${fN(p.fpts_per_k,2)}</span></td>
           <td><span class="sc ${relCls(p.cpt_opto_pct,allCO)}">${coN}</span></td>
-          <td><span class="sc ${relCls(p.flex_opto_pct,allFO)}">${foN}</span></td>
           <td><span class="sc ${relCls(p.cpt_proj_own,allCW)}">${cwN}</span></td>
+          <td><span class="sc ${relCls(p.flex_opto_pct,allFO)}">${foN}</span></td>
           <td><span class="sc ${relCls(p.flex_proj_own,allFW)}">${fwN}</span></td>
           <td><span class="sc ${relCls(p.xg,allXg)}">${fN(p.xg,3)}</span></td>
           <td><span class="sc ${relCls(p.xa,allXa)}">${fN(p.xa,3)}</span></td>
